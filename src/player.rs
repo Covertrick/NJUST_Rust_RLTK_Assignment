@@ -2,7 +2,7 @@ use rltk::{VirtualKeyCode, Rltk, Point};
 use specs::prelude::*;
 use std::cmp::{max, min};
 use super::{Position, Player, Viewshed, State, Map, RunState, CombatStats, WantsToMelee, Item,
-    gamelog::GameLog, WantsToPickupItem, TileType, Monster};
+    gamelog::GameLog, WantsToPickupItem, TileType, Monster, HungerClock, HungerState};
 
 pub fn try_move_player(delta_x: i32, delta_y: i32, ecs: &mut World) {
     let mut positions = ecs.write_storage::<Position>();
@@ -94,6 +94,16 @@ fn skip_turn(ecs: &mut World) -> RunState {
         }
     }
 
+    let hunger_clocks = ecs.read_storage::<HungerClock>();
+    let hc = hunger_clocks.get(*player_entity);
+    if let Some(hc) = hc {
+        match hc.state {
+            HungerState::Hungry => can_heal = false,
+            HungerState::Starving => can_heal = false,
+            _ => {}
+        }
+    }
+
     if can_heal {
         let mut health_components = ecs.write_storage::<CombatStats>();
         let player_hp = health_components.get_mut(*player_entity).unwrap();
@@ -138,7 +148,7 @@ pub fn player_input(gs: &mut State, ctx: &mut Rltk) -> RunState {
             VirtualKeyCode::B => try_move_player(-1, 1, &mut gs.ecs),
 
             // Skip Turn
-            VirtualKeyCode::Numpad5 |
+            VirtualKeyCode::Numpad5 => return skip_turn(&mut gs.ecs),
             VirtualKeyCode::Space => return skip_turn(&mut gs.ecs),
 
             // Level changes
